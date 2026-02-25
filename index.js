@@ -75,10 +75,10 @@ const pessoaNormalizada = [
 const predictions = await _predict(model, pessoaNormalizada);
 const results = predictions
     .sort((a, b) => b.probabilidade - a.probabilidade) // Ordena as previsões por probabilidade (do mais provável para o menos provável )
-    .map((pred) => `\n${labelsNomes[pred.index]}: ${(pred.probabilidade * 100).toFixed(2)}%`)
-    .join('\n') // Mapeia as previsões para o formato "categoria: probabilidade%"
+    .map((pred) => `${labelsNomes[pred.index]}: ${(pred.probabilidade * 100).toFixed(2)}%`)
+//    .join('\n') // Mapeia as previsões para o formato "categoria: probabilidade%"
 
-console.log("********** Probabilidades previstas para cada categoria (premium, medium, basic):", results);
+console.log(`********** Probabilidades previstas para cada categoria (premium, medium, basic) para a Pessoa \n\n"${pessoa.nome}":`, results);
 
 async function _trainModel(xs, ys) {
     // Criamos um modelo sequencial, que é uma pilha de camadas
