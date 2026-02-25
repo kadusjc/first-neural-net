@@ -55,7 +55,7 @@ Think of this like a smart recommendation system. Imagine you're running a strea
 
 ### Prerequisites
 
-- **Node.js** (v14 or higher) - [Download here](https://nodejs.org/)
+- **Node.js** (v22 to match with TensorFlow.js version) - [Download here](https://nodejs.org/)
 - **npm** or **yarn** package manager
 
 ### Installation
