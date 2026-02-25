@@ -1,73 +1,5 @@
 import tf from '@tensorflow/tfjs-node';
 
-
-async function _trainModel(xs, ys) {
-    // Criamos um modelo sequencial, que é uma pilha de camadas
-    const model = tf.sequential();
-
-    //Primeira camada da rede: (camada oculta)
-    //Entrada de 7 posições (idade normalizada + 3 cores + 3 localizações) e 80 neurônios, com função de ativação ReLU
-
-    //80 neuronios, pois tem pouca base de treinamento
-    //Quanto mais neurônios, mais complexa a rede, mas também mais propensa a aprender e a overfitting (ajuste excessivo aos dados de treinamento)
-    //ReLu é uma função de ativação que ajuda a rede a aprender padrões complexos, introduzindo não linearidade. Ela retorna 0 para entradas negativas e o valor da entrada para entradas positivas, o que ajuda a rede a aprender relações mais complexas entre os dados.
-    //Relu é como um filtro que permite que apenas os sinais positivos (dados interessantes) passem, ajudando a rede a focar em padrões relevantes e a evitar o problema de gradientes desaparecendo, onde os pesos param de ser atualizados durante o treinamento. Isso torna a ReLU uma escolha popular para camadas ocultas em redes neurais.
-    //Se a informação chegou nesse neurônio e é positiva, passa para frente, se for 0 ou negativa, pode jogar fora. Não serve para nada
-    model.add(tf.layers.dense({inputShape: [7], units: 80, activation: 'relu'}));
-
-
-    //Saída da rede: 3 neurônios (premium, medium, basic) e função de ativação softmax
-    //Softmax é uma função de ativação que transforma os valores de saída em probabilidades, ou seja, cada neurônio na camada de saída representará a probabilidade de pertencer a uma classe específica (premium, medium, basic). A soma das saídas da camada de saída será igual a 1, o que facilita a interpretação dos resultados como probabilidades.
-    model.add(tf.layers.dense({units: 3, activation: 'softmax'}));
-
-
-    //Compilamos o modelo, definindo a função de perda e o otimizador
-    //A função de perda 'categoricalCrossentropy' é usada para problemas de classificação multiclasse, onde as classes são mutuamente exclusivas (como premium, medium, basic). Ela mede a diferença entre as distribuições de probabilidade previstas pelo modelo e as distribuições reais (labels), penalizando mais fortemente as previsões incorretas.
-    //O otimizador 'adam' (Adaptive Moment Estimation) é um algoritmo de otimização que ajusta os pesos do modelo durante o treinamento para minimizar a função de perda. Ele combina as vantagens dos otimizadores AdaGrad e RMSProp, adaptando a taxa de aprendizado para cada peso individualmente, o que pode levar a uma convergência mais rápida e eficiente.
-    //Vai aprender com o histórico de erros e acertos, ajustando os pesos para melhorar a precisão das previsões ao longo do tempo.
-    //loss: categoricalCrossentropy, Compara o que o modelo acha (os scores de cada categoria) com a resposta correta (labels) e calcula o erro. O modelo tenta minimizar esse erro durante o treinamento, ajustando seus pesos para melhorar a precisão das previsões.
-    //a categoria premium será sempre [1, 0, 0]
-
-    //Quanto mais distante da previsão correta, maior será a perda, e o modelo tentará ajustar seus pesos para reduzir essa perda ao longo do tempo, melhorando assim a precisão das previsões.
-    //Exemplo classico: classificação de imagens, onde cada imagem é classificada em uma categoria específica (gato, cachorro, etc.). A função de perda ajuda a medir o quão bem o modelo está aprendendo a classificar as imagens corretamente. Recomendação e categorização de usuário. 
-    //Qualquer coisa em que a resposta certa seja apenas entre várias opções possíveis. Como classificação de texto, análise de sentimentos, etc.
-    model.compile({ 
-        optimizer: 'adam', 
-        loss: 'categoricalCrossentropy',
-        metrics: ['accuracy'] // Métrica para avaliar a precisão do modelo durante o treinamento
-    });
-
-
-    //Treinamos o modelo usando os dados de entrada (xs) e as labels (ys)
-    //O método fit é assíncrono, então usamos await para esperar o treinamento ser concluído antes de continuar.
-    //O número de épocas (epochs) define quantas vezes o modelo passará por todo o conjunto de dados durante o treinamento. Um número maior de épocas pode levar a um modelo mais preciso, mas também pode aumentar o risco de overfitting (ajuste excessivo aos dados de treinamento). É importante monitorar a perda e a precisão durante o treinamento para determinar quando parar.
-    await model.fit(xs, ys, {
-        verbose: 0, // Configura o nível de detalhes do log durante o treinamento. 0 = sem logs, 1 = barra de progresso, 2 = uma linha por época. Usar 0 para evitar poluição do console.
-        epochs: 100, // Número de vezes que o modelo passará por todo o conjunto de dados. Número de vezes de treinamento. Quanto mais épocas, mais o modelo aprende, mas também aumenta o risco de overfitting (ajuste excessivo aos dados de treinamento). É importante monitorar a perda e a precisão durante o treinamento para determinar quando parar.
-        shuffle: true, // Embaralha os dados a cada época (cada treinamento que ele fizer) para melhorar a generalização do modelo - Para não ficar algoritmo viciado (para evitar viés)
-        callbacks: {
-            onEpochEnd: (epoch, logs) => {
-                console.log(`Epoch ${epoch + 1}: loss = ${logs.loss.toFixed(4)}, loss percentage = ${(logs.loss * 100).toFixed(2)}%, accuracy = ${logs.acc.toFixed(4)}`);
-            }
-        }
-    });
-
-    return model;
-}
-
-async function _predict(model, pessoa) {
-    //transformar array js para o tensor do tensorflow
-    //input é um tensor 2D, mesmo formato dos dados de treinamento
-    const tfInput = tf.tensor2d(pessoa);
-
-    // Output - A previsão é um tensor de 3 possibilidades
-    const predict = await model.predict(tfInput);
-    const predictedValuesArray = await predict.array(); // Converte o tensor de previsão para um array JavaScript
-    //console.log("Probabilidades previstas para cada categoria (premium, medium, basic):", predictedValuesArray[0]);
-    const results = predictedValuesArray[0].map((probabilidade, index) => { return { probabilidade, index } }); 
-    return results;
-}
-
 // Exemplo de pessoas para treino (cada pessoa com idade, cor e localização)
 // const pessoas = [
 //     { nome: "Erick", idade: 30, cor: "azul", localizacao: "São Paulo" },
@@ -148,5 +80,69 @@ const results = predictions
 
 console.log("********** Probabilidades previstas para cada categoria (premium, medium, basic):", results);
 
+async function _trainModel(xs, ys) {
+    // Criamos um modelo sequencial, que é uma pilha de camadas
+    const model = tf.sequential();
+
+    //Primeira camada da rede: (camada oculta)
+    //Entrada de 7 posições (idade normalizada + 3 cores + 3 localizações) e 80 neurônios, com função de ativação ReLU
+
+    //80 neuronios, pois tem pouca base de treinamento
+    //Quanto mais neurônios, mais complexa a rede, mas também mais propensa a aprender e a overfitting (ajuste excessivo aos dados de treinamento)
+    //ReLu é uma função de ativação que ajuda a rede a aprender padrões complexos, introduzindo não linearidade. Ela retorna 0 para entradas negativas e o valor da entrada para entradas positivas, o que ajuda a rede a aprender relações mais complexas entre os dados.
+    //Relu é como um filtro que permite que apenas os sinais positivos (dados interessantes) passem, ajudando a rede a focar em padrões relevantes e a evitar o problema de gradientes desaparecendo, onde os pesos param de ser atualizados durante o treinamento. Isso torna a ReLU uma escolha popular para camadas ocultas em redes neurais.
+    //Se a informação chegou nesse neurônio e é positiva, passa para frente, se for 0 ou negativa, pode jogar fora. Não serve para nada
+    model.add(tf.layers.dense({inputShape: [7], units: 80, activation: 'relu'}));
 
 
+    //Saída da rede: 3 neurônios (premium, medium, basic) e função de ativação softmax
+    //Softmax é uma função de ativação que transforma os valores de saída em probabilidades, ou seja, cada neurônio na camada de saída representará a probabilidade de pertencer a uma classe específica (premium, medium, basic). A soma das saídas da camada de saída será igual a 1, o que facilita a interpretação dos resultados como probabilidades.
+    model.add(tf.layers.dense({units: 3, activation: 'softmax'}));
+
+
+    //Compilamos o modelo, definindo a função de perda e o otimizador
+    //A função de perda 'categoricalCrossentropy' é usada para problemas de classificação multiclasse, onde as classes são mutuamente exclusivas (como premium, medium, basic). Ela mede a diferença entre as distribuições de probabilidade previstas pelo modelo e as distribuições reais (labels), penalizando mais fortemente as previsões incorretas.
+    //O otimizador 'adam' (Adaptive Moment Estimation) é um algoritmo de otimização que ajusta os pesos do modelo durante o treinamento para minimizar a função de perda. Ele combina as vantagens dos otimizadores AdaGrad e RMSProp, adaptando a taxa de aprendizado para cada peso individualmente, o que pode levar a uma convergência mais rápida e eficiente.
+    //Vai aprender com o histórico de erros e acertos, ajustando os pesos para melhorar a precisão das previsões ao longo do tempo.
+    //loss: categoricalCrossentropy, Compara o que o modelo acha (os scores de cada categoria) com a resposta correta (labels) e calcula o erro. O modelo tenta minimizar esse erro durante o treinamento, ajustando seus pesos para melhorar a precisão das previsões.
+    //a categoria premium será sempre [1, 0, 0]
+
+    //Quanto mais distante da previsão correta, maior será a perda, e o modelo tentará ajustar seus pesos para reduzir essa perda ao longo do tempo, melhorando assim a precisão das previsões.
+    //Exemplo classico: classificação de imagens, onde cada imagem é classificada em uma categoria específica (gato, cachorro, etc.). A função de perda ajuda a medir o quão bem o modelo está aprendendo a classificar as imagens corretamente. Recomendação e categorização de usuário. 
+    //Qualquer coisa em que a resposta certa seja apenas entre várias opções possíveis. Como classificação de texto, análise de sentimentos, etc.
+    model.compile({ 
+        optimizer: 'adam', 
+        loss: 'categoricalCrossentropy',
+        metrics: ['accuracy'] // Métrica para avaliar a precisão do modelo durante o treinamento
+    });
+
+
+    //Treinamos o modelo usando os dados de entrada (xs) e as labels (ys)
+    //O método fit é assíncrono, então usamos await para esperar o treinamento ser concluído antes de continuar.
+    //O número de épocas (epochs) define quantas vezes o modelo passará por todo o conjunto de dados durante o treinamento. Um número maior de épocas pode levar a um modelo mais preciso, mas também pode aumentar o risco de overfitting (ajuste excessivo aos dados de treinamento). É importante monitorar a perda e a precisão durante o treinamento para determinar quando parar.
+    await model.fit(xs, ys, {
+        verbose: 0, // Configura o nível de detalhes do log durante o treinamento. 0 = sem logs, 1 = barra de progresso, 2 = uma linha por época. Usar 0 para evitar poluição do console.
+        epochs: 100, // Número de vezes que o modelo passará por todo o conjunto de dados. Número de vezes de treinamento. Quanto mais épocas, mais o modelo aprende, mas também aumenta o risco de overfitting (ajuste excessivo aos dados de treinamento). É importante monitorar a perda e a precisão durante o treinamento para determinar quando parar.
+        shuffle: true, // Embaralha os dados a cada época (cada treinamento que ele fizer) para melhorar a generalização do modelo - Para não ficar algoritmo viciado (para evitar viés)
+        callbacks: {
+            onEpochEnd: (epoch, logs) => {
+                console.log(`Epoch ${epoch + 1}: loss = ${logs.loss.toFixed(4)}, loss percentage = ${(logs.loss * 100).toFixed(2)}%, accuracy = ${logs.acc.toFixed(4)}`);
+            }
+        }
+    });
+
+    return model;
+}
+
+async function _predict(model, pessoa) {
+    //transformar array js para o tensor do tensorflow
+    //input é um tensor 2D, mesmo formato dos dados de treinamento
+    const tfInput = tf.tensor2d(pessoa);
+
+    // Output - A previsão é um tensor de 3 possibilidades
+    const predict = await model.predict(tfInput);
+    const predictedValuesArray = await predict.array(); // Converte o tensor de previsão para um array JavaScript
+    //console.log("Probabilidades previstas para cada categoria (premium, medium, basic):", predictedValuesArray[0]);
+    const results = predictedValuesArray[0].map((probabilidade, index) => { return { probabilidade, index } }); 
+    return results;
+}
